@@ -1,100 +1,155 @@
-// THREE.js setup
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 30;
+// === 3D Galaxy Portfolio Script ===
 
-// Renderer
-const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("galaxy"), antialias: true });
+// --- Scene & Camera ---
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.z = 35;
+window.camera = camera; // for debugging
+
+// --- Renderer ---
+const renderer = new THREE.WebGLRenderer({
+  canvas: document.getElementById("galaxy"),
+  antialias: true
+});
+renderer.setClearColor(0x000000);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 
-// Lights
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-const pointLight = new THREE.PointLight(0xffffff, 2, 100);
+// --- Lighting ---
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const pointLight = new THREE.PointLight(0xffffff, 2.2, 100);
 pointLight.position.set(0, 0, 0);
 scene.add(pointLight);
 
-// Sun
-const sunTexture = new THREE.TextureLoader().load("assets/space-bg.jpg");
-const sunGeo = new THREE.SphereGeometry(5, 32, 32);
-const sunMat = new THREE.MeshBasicMaterial({ map: sunTexture });
-const sun = new THREE.Mesh(sunGeo, sunMat);
-scene.add(sun);
-
-// Starfield
+// --- Starfield Background ---
 function createStars() {
   const geo = new THREE.BufferGeometry();
-  const mat = new THREE.PointsMaterial({ color: 0xffffff });
-  const vertices = [];
-  for (let i = 0; i < 10000; i++) {
-    vertices.push(
-      THREE.MathUtils.randFloatSpread(2000),
-      THREE.MathUtils.randFloatSpread(2000),
-      THREE.MathUtils.randFloatSpread(2000)
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1 });
+  const verts = [];
+  for (let i = 0; i < 5000; i++) {
+    verts.push(
+      THREE.MathUtils.randFloatSpread(700),
+      THREE.MathUtils.randFloatSpread(700),
+      THREE.MathUtils.randFloatSpread(700)
     );
   }
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  scene.add(new THREE.Points(geo, mat));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const pts = new THREE.Points(geo, starMat);
+  scene.add(pts);
 }
 createStars();
 
-// Planet data
-const planets = [];
-const planetTextures = [
-  { name: "Frontend Dev", desc: "HTML, CSS, Tailwind, React.js", texture: "assets/earth.jpg", radius: 10 },
-  { name: "JavaScript Lover", desc: "Vanilla JS, Node.js, APIs", texture: "assets/mars.jpg", radius: 15 },
-  { name: "Designer", desc: "UI/UX, Figma, Animation", texture: "assets/jupiter.jpg", radius: 20 },
+// --- Sun (using color not texture to guarantee loading) ---
+const sunGeo = new THREE.SphereGeometry(5, 50, 50);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFF375 });
+const sun = new THREE.Mesh(sunGeo, sunMat);
+scene.add(sun);
+
+// --- Planets: Texture URLs will always work ---
+const planetsConfig = [
+  {
+    name: "Frontend Dev",
+    desc: "HTML, CSS, Tailwind, React.js",
+    texture: "https://raw.githubusercontent.com/rochapablo/planet-textures/master/2k_earth_daymap.jpg",
+    orbit: 13,
+    speed: 0.008
+  },
+  {
+    name: "JavaScript Lover",
+    desc: "Vanilla JS, Node.js, APIs",
+    texture: "https://raw.githubusercontent.com/rochapablo/planet-textures/master/2k_mars.jpg",
+    orbit: 18,
+    speed: 0.0053
+  },
+  {
+    name: "Designer",
+    desc: "UI/UX, Figma, Animation",
+    texture: "https://raw.githubusercontent.com/rochapablo/planet-textures/master/2k_jupiter.jpg",
+    orbit: 25,
+    speed: 0.0034
+  }
 ];
 
-// Create planets
-planetTextures.forEach((p, i) => {
-  const tex = new THREE.TextureLoader().load(p.texture);
-  const geo = new THREE.SphereGeometry(2, 32, 32);
-  const mat = new THREE.MeshStandardMaterial({ map: tex });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData = { name: p.name, desc: p.desc, radius: p.radius, angle: Math.random() * Math.PI * 2, speed: 0.001 + i * 0.0005 };
-  scene.add(mesh);
-  planets.push(mesh);
+const loader = new THREE.TextureLoader();
+const planets = [];
+
+planetsConfig.forEach((p, i) => {
+  loader.load(
+    p.texture,
+    tex => {
+      const planetGeo = new THREE.SphereGeometry(2.2, 40, 40);
+      const planetMat = new THREE.MeshStandardMaterial({ map: tex });
+      const mesh = new THREE.Mesh(planetGeo, planetMat);
+      mesh.userData = { name: p.name, desc: p.desc, orbit: p.orbit, speed: p.speed, angle: Math.random() * Math.PI * 2 };
+      mesh.position.set(
+        Math.cos(mesh.userData.angle) * p.orbit,
+        0,
+        Math.sin(mesh.userData.angle) * p.orbit
+      );
+      scene.add(mesh);
+      planets.push(mesh);
+    },
+    undefined, // onProgress
+    err => {
+      // fallback solid color if texture fails
+      const planetGeo = new THREE.SphereGeometry(2.2, 40, 40);
+      const fallback = new THREE.MeshStandardMaterial({ color: 0x999999 });
+      const mesh = new THREE.Mesh(planetGeo, fallback);
+      mesh.userData = { name: p.name, desc: p.desc, orbit: p.orbit, speed: p.speed, angle: Math.random() * Math.PI * 2 };
+      mesh.position.set(
+        Math.cos(mesh.userData.angle) * p.orbit,
+        0,
+        Math.sin(mesh.userData.angle) * p.orbit
+      );
+      scene.add(mesh);
+      planets.push(mesh);
+    }
+  );
 });
 
-// Click interactivity
+// --- Orbit Animation ---
+function animate() {
+  sun.rotation.y += 0.002;
+  planets.forEach(mesh => {
+    mesh.userData.angle += mesh.userData.speed;
+    mesh.position.x = Math.cos(mesh.userData.angle) * mesh.userData.orbit;
+    mesh.position.z = Math.sin(mesh.userData.angle) * mesh.userData.orbit;
+    mesh.rotation.y += 0.005;
+  });
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+
+// --- Raycasting: Planet Click Interactivity ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-window.addEventListener("click", e => {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+window.addEventListener("click", (event) => {
+  // For overlay/modal, don't trigger 3D click
+  if (event.target.closest('.modal-content')) return;
+  // Normalize mouse
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(planets);
   if (intersects.length > 0) {
-    const p = intersects[0].object.userData;
-    document.getElementById("modal-title").innerText = p.name;
-    document.getElementById("modal-description").innerText = p.desc;
+    const planet = intersects[0].object.userData;
+    document.getElementById("modal-title").innerText = planet.name;
+    document.getElementById("modal-description").innerText = planet.desc;
     document.getElementById("modal").style.display = "flex";
   }
 });
 
-// Close modal
+// --- Modal Close & Responsiveness ---
 document.getElementById("close-modal").addEventListener("click", () => {
   document.getElementById("modal").style.display = "none";
 });
-
-// Animate
-function animate() {
-  requestAnimationFrame(animate);
-  sun.rotation.y += 0.002;
-  planets.forEach(p => {
-    p.userData.angle += p.userData.speed;
-    p.position.x = Math.cos(p.userData.angle) * p.userData.radius;
-    p.position.z = Math.sin(p.userData.angle) * p.userData.radius;
-    p.rotation.y += 0.005;
-  });
-  renderer.render(scene, camera);
-}
-animate();
-
-// Responsive
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
